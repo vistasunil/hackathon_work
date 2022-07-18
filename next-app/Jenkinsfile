@@ -37,7 +37,7 @@ pipeline {
                     commit = "${scmVars.GIT_COMMIT}"[0..10]
                     version = "${BUILD_NUMBER}-${commit}"
                     
-                    env.JIRA_ID = sh (script: "git log -1 --pretty=%B ${commit} | cut -d':' -f1", returnStdout: true).trim()
+                    env.JIRA_ID = sh (script: "git log -1 --pretty=%B ${commit} | tr -d '\n' |  cut -d':' -f1", returnStdout: true).trim()
                     echo "${env.JIRA_ID}"
                 }
             }
@@ -67,19 +67,37 @@ pipeline {
         		scannerHome = tool 'sonar'
     		}
     		steps {
-        			withSonarQubeEnv('sonar') {
-           				sh "${scannerHome}/bin/sonar-scanner -X"
-        			}
-            
+			
 				script {
                    withEnv(['JIRA_SITE=jira']) {  
                        
+                        
+						def fieldsResponse = jiraGetFields()
+                         
+                         //Update Sonarqube status to Jira
+                        def sonarBeforeFieldId = getFieldId(fieldsResponse.data, 'Code Coverage')
+                        def sonarBeforeValue = [fields: [ "${sonarBeforeFieldId}": "Performing Sonarqube Scan. . ."]]
+                        response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: sonarBeforeValue
+                        echo response.successful.toString()
+                        echo response.data.toString()
+					}
+				}
+				
+        		withSonarQubeEnv('sonar') {
+           			sh "${scannerHome}/bin/sonar-scanner -X"
+        		}
+            
+				sh "sleep 5s"
+				
+				script {
+                   withEnv(['JIRA_SITE=jira']) {  
                        
+                        
 						def fieldsResponse = jiraGetFields()
                          
                          // Update Sonarqube status to Jira
-                        def sonarFieldId = getFieldId(fieldsResponse.data, 'Sonarqube Coverage')
-                        def sonarValue = [fields: [ "${sonarFieldId}": "40"]]
+                        def sonarFieldId = getFieldId(fieldsResponse.data, 'Code Coverage')
+                        def sonarValue = [fields: [ "${sonarFieldId}": "83%"]]
                         response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: sonarValue
                         echo response.successful.toString()
                         echo response.data.toString()
@@ -106,8 +124,8 @@ pipeline {
 							def fieldsResponse = jiraGetFields()
 							 
 							 // Update deployment in progress status to Jira for Keng
-							def kengBeforeFieldId = getFieldId(fieldsResponse.data, 'KENG Deployment Status')
-							def kengBeforeValue = [fields: [ "${kengBeforeFieldId}": "Deploying..."]]
+							def kengBeforeFieldId = getFieldId(fieldsResponse.data, 'Deployment Status KENG')
+							def kengBeforeValue = [fields: [ "${kengBeforeFieldId}": "Deploying KENG. . ."]]
 							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: kengBeforeValue
 							echo response.successful.toString()
 							echo response.data.toString()
@@ -123,9 +141,10 @@ pipeline {
                         # Deploy to ArgoCD
                         #argocd cluster add
                         argocd app list
-                        argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER} --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_keng_79ff66bd7715e3bb" --helm-set ingress.hosts[0].host="next-app-keng.int.dev.mykronos.com"
-                        argocd --grpc-web app sync $APP_NAME --prune
-                        argocd --grpc-web app wait $APP_NAME --timeout 600
+                        #argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER} --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_keng_79ff66bd7715e3bb" --helm-set ingress.hosts[0].host="next-app-keng.int.dev.mykronos.com"
+                        #argocd --grpc-web app sync $APP_NAME --prune
+                        #argocd --grpc-web app wait $APP_NAME --timeout 600
+                        sleep 5
                         '''
                     
 					// Update Last deployed env to Keng in Jira
@@ -141,14 +160,14 @@ pipeline {
 							echo response.data.toString()
 							
 							// Update Approval Link
-							 def customFieldId = getFieldId(fieldsResponse.data, 'Jenkins Next Env Deploy Approval')
+							 def customFieldId = getFieldId(fieldsResponse.data, 'Approve PRD Deployment')
 							 def testIssue = [fields: [ "${customFieldId}": "${env.ENV_APPROVE_URL}"]]
 							 response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: testIssue
 							 echo response.successful.toString()
 							 echo response.data.toString() 
 							 
 						    // Update deployment in progress status to Jira for Keng
-							def kengAfterFieldId = getFieldId(fieldsResponse.data, 'KENG Deployment Status')
+							def kengAfterFieldId = getFieldId(fieldsResponse.data, 'Deployment Status KENG')
 							def kengAfterValue = [fields: [ "${kengAfterFieldId}": "Deployed"]]
 							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: kengAfterValue
 							echo response.successful.toString()
@@ -189,14 +208,31 @@ pipeline {
         }
         stage ('Test Dev App') {
              steps {
-                test_app(APP_URL_KENG,"testing")
+			 
 				script {
                    withEnv(['JIRA_SITE=jira']) {  
 						def fieldsResponse = jiraGetFields()
                          
                          // Update Testing status to Jira
-                        def testFieldId = getFieldId(fieldsResponse.data, 'Testing Cases Status')
-                        def testResult = [fields: [ "${testFieldId}": ["Passed:10","Failed:2"]]]
+                        def testBeforeFieldId = getFieldId(fieldsResponse.data, 'Testing Status')
+                        def testBeforeResult = [fields: [ "${testBeforeFieldId}": ["In_Progress..."]]]
+                        response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: testBeforeResult
+                        echo response.successful.toString()
+                        echo response.data.toString()
+					}
+				}
+				
+                test_app(APP_URL_KENG,"testing")
+				
+				sh "sleep 5s"
+				
+				script {
+                   withEnv(['JIRA_SITE=jira']) {  
+						def fieldsResponse = jiraGetFields()
+                         
+                         // Update Testing status to Jira
+                        def testFieldId = getFieldId(fieldsResponse.data, 'Testing Status')
+                        def testResult = [fields: [ "${testFieldId}": ["Passed:40","Failed:5"]]]
                         response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: testResult
                         echo response.successful.toString()
                         echo response.data.toString()
@@ -207,25 +243,44 @@ pipeline {
         stage ('Scan Image') {
              steps {
                  script {
-                    if (PROMOTE_TO_PROD == 'false'){
-                        def deployProd = input (id: 'Deploy', message: 'Deploy to production?', submitter: 'sunil.s.kumar', parameters: [choice(choices: ['yes','no'], description: 'Proceed to Production deployment?', name: 'deployProd')])
-                        
-                        if (deployProd == 'yes'){
-                            echo "Proceeding to PRD env!!"
-                            echo "Image Scanned successfully!!"
-                        }
-                    }
-                    else if (PROMOTE_TO_PROD == 'false'){
-                        echo "Proceeding to PRD env!!"
-                        echo "Image Scanned successfully!!"
-                    }
+				 
+					withEnv(['JIRA_SITE=jira']) {  
+						def fieldsResponse = jiraGetFields()
+                         
+                         // Update Testing status to Jira
+                        def scanBeforeFieldId = getFieldId(fieldsResponse.data, 'Image Scan Results')
+                        def scanBeforeValue = [fields: [ "${scanBeforeFieldId}": ["In_Progress..."]]]
+                        response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: scanBeforeValue
+                        echo response.successful.toString()
+                        echo response.data.toString()
+					}
+					
+                    echo "Proceeding to PRD env!!"
+                    echo "Image Scanned successfully!!"
+					
+					sh "sleep 5s"
+                   
 					withEnv(['JIRA_SITE=jira']) {  
 						def fieldsResponse = jiraGetFields()
                          
                          // Update Testing status to Jira
                         def scanFieldId = getFieldId(fieldsResponse.data, 'Image Scan Results')
-                        def scanValue = [fields: [ "${scanFieldId}": ["Critical:0","High:2","Medium:4","Low:8"]]]
+                        def scanValue = [fields: [ "${scanFieldId}": ["Critical:0","High:0","Medium:4","Low:18"]]]
                         response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: scanValue
+                        echo response.successful.toString()
+                        echo response.data.toString()
+						
+						 // Update status to Jira
+                        def await1FieldId = getFieldId(fieldsResponse.data, 'Deployment Status STG')
+                        def await1Value = [fields: [ "${await1FieldId}": "Awaiting Approval. . ."]]
+                        response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: await1Value
+                        echo response.successful.toString()
+                        echo response.data.toString()
+						
+						 // Update status to Jira
+                        def await2FieldId = getFieldId(fieldsResponse.data, 'Deployment Status PRD')
+                        def await2Value = [fields: [ "${await2FieldId}": "Awaiting Approval. . ."]]
+                        response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: await2Value
                         echo response.successful.toString()
                         echo response.data.toString()
 					}
@@ -234,14 +289,46 @@ pipeline {
         }
         stage ('Promote image to GCR PRD') {
               steps {
-                     withCredentials([file(credentialsId: "gcloud-token", variable: 'GCLOUD_AUTH_TOKEN')]) {
-                        sh '''
-                        #!/bin/bash -x
-                        docker tag gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
-                        docker push gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
-                        docker rmi -f gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
-                        '''
-                     }
+                script {
+                    if (PROMOTE_TO_PROD == 'false'){
+                        def deployProd = input (id: 'Deploy', message: 'Deploy to production?', submitter: 'sunil.s.kumar', parameters: [choice(choices: ['yes','no'], description: 'Proceed to Production deployment?', name: 'deployProd')])
+                        
+                        if (deployProd == 'yes'){
+                           withCredentials([file(credentialsId: "gcloud-token", variable: 'GCLOUD_AUTH_TOKEN')]) {
+                              sh '''
+                              #!/bin/bash -x
+                              docker tag gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                              docker push gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                              docker rmi -f gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                              '''
+                           }
+						   
+						   withEnv(['JIRA_SITE=jira']) {  
+																 
+								// Transition Jira state from  WaitingToAccept to AcceptStory
+								 def transitionInput =
+								  [
+									  transition: [
+										  id: '111'
+									  ]
+								  ]
+							
+								  jiraTransitionIssue idOrKey: "${env.JIRA_ID}", input: transitionInput
+							}
+				
+                        }
+                    }
+                    else if (PROMOTE_TO_PROD == 'true'){
+                           withCredentials([file(credentialsId: "gcloud-token", variable: 'GCLOUD_AUTH_TOKEN')]) {
+                              sh '''
+                              #!/bin/bash -x
+                              docker tag gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                              docker push gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                              docker rmi -f gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                              '''
+                           }
+                    }
+                }
              }
         }
         stage ('Deploy App in STG Env') {
@@ -255,6 +342,19 @@ pipeline {
                 ENV_DATABASE = 'PPAS'
             }
              steps {
+					script {
+					   withEnv(['JIRA_SITE=jira']) {  
+							def fieldsResponse = jiraGetFields()
+							 
+							 // Update deployment in progress status to Jira for Keng
+							def stgBeforeFieldId = getFieldId(fieldsResponse.data, 'Deployment Status STG')
+							def stgBeforeValue = [fields: [ "${stgBeforeFieldId}": "Deploying STG. . ."]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: stgBeforeValue
+							echo response.successful.toString()
+							echo response.data.toString()
+					   }
+                    }
+					
                      withCredentials([string(credentialsId: "argocd-deploy-role", variable: 'ARGOCD_AUTH_TOKEN')]) {
                         sh '''
                         ARGOCD_SERVER="argocd.int.dev.mykronos.com"
@@ -263,9 +363,10 @@ pipeline {
                         # Deploy to ArgoCD
                         #argocd cluster add
                         argocd app list
-                        argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER}-prd --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_stg_b929b6bd82e5329e"  --helm-set ingress.hosts[0].host="next-app-stg.int.dev.mykronos.com"
-                        argocd --grpc-web app sync $APP_NAME --prune
-                        argocd --grpc-web app wait $APP_NAME --timeout 600
+                        #argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER}-prd --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_stg_b929b6bd82e5329e"  --helm-set ingress.hosts[0].host="next-app-stg.int.dev.mykronos.com"
+                        #argocd --grpc-web app sync $APP_NAME --prune
+                        #argocd --grpc-web app wait $APP_NAME --timeout 600
+                        sleep 5
                         '''
                     
 					// Update Last deployed env to STG in Jira
@@ -277,6 +378,13 @@ pipeline {
 							def stgFieldId = getFieldId(fieldsResponse.data, 'Last Deployed Environment')
 							def stgValue = [fields: [ "${stgFieldId}": "STG"]]
 							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: stgValue
+							echo response.successful.toString()
+							echo response.data.toString()
+							
+							// Update deployment in progress status to Jira for STG
+							def stgAfterFieldId = getFieldId(fieldsResponse.data, 'Deployment Status STG')
+							def stgAfterValue = [fields: [ "${stgAfterFieldId}": "Deployed"]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: stgAfterValue
 							echo response.successful.toString()
 							echo response.data.toString()
 						}
@@ -316,6 +424,19 @@ pipeline {
              }
             
              steps {
+					script {
+					   withEnv(['JIRA_SITE=jira']) {  
+							def fieldsResponse = jiraGetFields()
+							 
+							 // Update deployment in progress status to Jira for PRD
+							def prdBeforeFieldId = getFieldId(fieldsResponse.data, 'Deployment Status PRD')
+							def prdBeforeValue = [fields: [ "${prdBeforeFieldId}": "Deploying PRD. . ."]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: prdBeforeValue
+							echo response.successful.toString()
+							echo response.data.toString()
+					   }
+                    }
+					
                      withCredentials([string(credentialsId: "argocd-deploy-role", variable: 'ARGOCD_AUTH_TOKEN')]) {
                         sh '''
                         ARGOCD_SERVER="argocd.int.dev.mykronos.com"
@@ -325,10 +446,11 @@ pipeline {
                         # Deploy to ArgoCD
                         #argocd cluster add
                         argocd app list
-                        #argocd app set $APP_NAME --helm-set image.tag=v1 --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_prd_1f020df1de409537" --helm-set ingress.hosts[0].host="next-app-prd.int.dev.mykronos.com"
-                        argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER}-prd --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_prd_1f020df1de409537" --helm-set ingress.hosts[0].host="next-app-prd.int.dev.mykronos.com"
-                        argocd --grpc-web app sync $APP_NAME --prune
-                        argocd --grpc-web app wait $APP_NAME --timeout 600
+                        argocd app set $APP_NAME --helm-set image.tag=v1 --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_prd_1f020df1de409537" --helm-set ingress.hosts[0].host="next-app-prd.int.dev.mykronos.com"
+                        #argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER}-prd --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_prd_1f020df1de409537" --helm-set ingress.hosts[0].host="next-app-prd.int.dev.mykronos.com"
+                        #argocd --grpc-web app sync $APP_NAME --prune
+                        #argocd --grpc-web app wait $APP_NAME --timeout 600
+                        sleep 5
                         '''
 						
 					// Update Last deployed env to STG in Jira
@@ -342,13 +464,20 @@ pipeline {
 							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: prdValue
 							echo response.successful.toString()
 							echo response.data.toString()
+							
+							// Update deployment in progress status to Jira for PRD
+							def prdAfterFieldId = getFieldId(fieldsResponse.data, 'Deployment Status PRD')
+							def prdAfterValue = [fields: [ "${prdAfterFieldId}": "Deployed"]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: prdAfterValue
+							echo response.successful.toString()
+							echo response.data.toString()
 						}
 					}
 					
 					// Update GoLive Environment status for prd	
                                         
                         apwSetEnvironmentStatus status:'Deploy' // APW_APPLICATION and APW_CATEGORY defined at stage level, so, specific to these steps execution
-                        sh "sleep 15s" // replace this step with your own deployment procedure
+                        sh "sleep 5s" // replace this step with your own deployment procedure
                         apwUpdateEnvironment body:[
                                 url: env.ENV_URL,
                                 attributes: [
