@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "growthbook.fullname" . }}
+  labels:
+    {{- include "growthbook.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 3100
+      targetPort: app
+      protocol: TCP
+      name: app
+  selector:
+    {{- include "growthbook.selectorLabels" . | nindent 4 }}

@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "growthbook.fullname" . }}
+  labels:
+    {{- include "growthbook.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "growthbook.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "growthbook.selectorLabels" . | nindent 8 }}
+    spec:
+      containers:
+        - name: growthbook
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: MONGODB_URI
+            value: "mongodb://root:password@localhost:27017/"
+          - name: API_HOST 
+            value: "http://growthbook-api.int.dev.mykronos.com"
+          - name: APP_ORIGIN
+            value: "http://growthbook.int.dev.mykronos.com"
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: app
+              containerPort: 3100
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+        - name: mongo
+          image: "mongo:latest"
+          imagePullPolicy: IfNotPresent
+          env:
+          - name: MONGO_INITDB_ROOT_USERNAME
+            value: "root"
+          - name: MONGO_INITDB_ROOT_PASSWORD
+            value: "password"
+          ports:
+            - name: mongo
+              containerPort: 27017
+              protocol: TCP
+      volumes:
+        - name: {{ .Values.volume.name }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.pvc.claimName }}

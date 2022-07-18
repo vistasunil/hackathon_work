@@ -1,0 +1,36 @@
+replicaCount: 1
+
+image:
+  repository: growthbook/growthbook
+  tag: "latest"
+
+nameOverride: ""
+fullnameOverride: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: growthbook.int.dev.mykronos.com
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+
+volume:
+  name: uploads-persistent-storage
+  mountPath: /usr/local/src/app/packages/back-end/uploads
+
+# Specify your storage class spec for persisting upload images to external file system
+pvc:
+ claimName: growthbook-efs-claim
+ storageClassName: standard
+ storage: 5Gi
