@@ -1,0 +1,24 @@
+apiVersion: tekton.dev/v1beta1
+kind: PipelineRun
+metadata:
+  generateName: picalc-pr-
+  name: pr1
+spec:
+  pipelineRef:
+    name: build-and-deploy-pipeline
+  params:
+    - name: gitUrl
+      value: https://github.com/vistasunil/tekton-argocd.git
+    - name: gitRevision
+      value: master
+    - name: pathToYamlFile
+      value: "kubernetes/picalc.yaml"
+    - name: imageUrl
+      value: registry.hub.docker.com/vistasunil/picalc
+    - name: imageTag
+      value: "1.0"
+  serviceAccountName: pipeline-account
+  workspaces:
+    - name: git-source
+      persistentVolumeClaim:
+        claimName: picalc-source-pvc

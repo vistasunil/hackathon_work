@@ -1,0 +1,187 @@
+@Library('apwide-jenkins-shared-lib') _
+
+APP_URL = ["http://next-app.int.dev.mykronos.com"]
+
+pipeline {
+    agent {
+        node {
+            label 'docker-vm'
+        }
+    }
+    environment {
+        APW_JIRA_BASE_URL = 'http://jira.int.dev.mykronos.com' // these variables can be defined at different level: jenkins global properties, pipeline level, stage level
+        APW_JIRA_CREDENTIALS_ID = 'jira-credentials'
+        APW_APPLICATION = 'coe_next_app'
+    }
+    stages {
+        stage('Prepare') {
+            steps {
+                checkout([$class: 'GitSCM',
+                branches: [[name: "master"]],
+                doGenerateSubmoduleConfigurations: false,
+                submoduleCfg: [],
+                userRemoteConfigs: [[credentialsId: 'bitbucket', url: 'http://bitbucket.int.dev.mykronos.com/scm/kub/next-app.git']]
+                ])
+            }
+        }
+        stage ('Check Code Quality') {
+             steps {
+                echo "Passed code quality parameters successfully!!"
+             }
+        }
+        stage ('Build and Push Docker Image') {
+             steps {
+                     withCredentials([file(credentialsId: "gcloud-token", variable: 'GCLOUD_AUTH_TOKEN')]) {
+                        sh '''
+                        #!/bin/bash -x
+                        set -e
+                        gcloud config set project gcp-keng01
+                        gcloud auth activate-service-account --key-file="$GCLOUD_AUTH_TOKEN"
+                        cd ${WORKSPACE}/
+                        docker build --network host -f build/Dockerfile --pull -t gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} .
+                        cat $GCLOUD_AUTH_TOKEN |  docker login -u _json_key --password-stdin https://gcr.io
+                        docker push gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}
+                        '''
+                     }
+             }
+        }
+        stage ('Deploy_K8s Dev Env') {
+
+            environment {
+                APW_CATEGORY = 'Development'
+                APW_ENVIRONMENT_ID = '15'
+                ENV_URL = 'http://next-app.int.dev.mykronos.com'
+                ENV_OS = 'Docker'
+                ENV_OWNER = 'wfdk8steam@ukg.com'
+                ENV_DATABASE = 'PPAS'
+            }
+             steps {
+                     withCredentials([string(credentialsId: "argocd-deploy-role", variable: 'ARGOCD_AUTH_TOKEN')]) {
+                        sh '''
+                        ARGOCD_SERVER="argocd.int.dev.mykronos.com"
+                        APP_NAME="next-app"
+                        argocd login --username admin --password admin argocd.int.dev.mykronos.com --insecure
+                        # Deploy to ArgoCD
+                        #argocd cluster add
+                        argocd app list
+                        argocd app set next-app --helm-set image.tag=${BUILD_NUMBER} --helm-set gb_key=key_KENG_ae230e3ce2362720
+                        argocd --grpc-web app sync $APP_NAME --prune
+                        argocd --grpc-web app wait $APP_NAME --timeout 600
+                        '''
+
+                    apwSetEnvironmentStatus status:'Deploy' // update status change to 'Deploy' for environment identified by APW_APPLICATION and APW_CATEGORY
+
+                    sh "sleep 5s" // replace this step with your own deployment procedure
+
+                    apwUpdateEnvironment body:[
+                            url: env.ENV_URL,
+                            attributes: [
+                                    OS: env.ENV_OS,
+                                    Owner: env.ENV_OWNER,
+                                    Database: env.ENV_DATABASE
+                            ]
+                    ] // update environment information with data we can collect in jenkins for environment identified by APW_ENVIRONMENT_ID
+
+                    apwSetDeployedVersion version:currentBuild.number // update deployed version for environment identified by APW_APPLICATION and APW_CATEGORY
+
+                    apwSetEnvironmentStatus status:'UP'
+               }
+            }
+        }
+        stage ('Test Dev App') {
+             steps {
+                test_app(APP_URL,"testing")
+             }
+        }
+        stage ('Scan App Image') {
+             steps {
+                 echo "Image Scanned successfully!!"
+             }
+        }
+        stage ('Promote image to Prod') {
+              steps {
+                     withCredentials([file(credentialsId: "gcloud-token", variable: 'GCLOUD_AUTH_TOKEN')]) {
+                        sh '''
+                        #!/bin/bash -x
+                        docker tag gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                        docker push gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                        docker rmi -f gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                        '''
+                     }
+             }
+        }
+        stage ('Deploy_K8s Prod Env') {
+             when {
+                 equals expected: 'Prod', actual: 'Prod'
+             }
+             environment {
+                 APW_CATEGORY = 'Production'
+                 APW_ENVIRONMENT_ID = '17'
+                 ENV_URL = 'http://next-app.int.dev.mykronos.com'
+                 ENV_OS = 'Ubuntu'
+                 ENV_OWNER = 'wfdk8steam@ukg.com'
+                 ENV_DATABASE = 'Postgres'
+             }
+
+             steps {
+                     withCredentials([string(credentialsId: "argocd-deploy-role", variable: 'ARGOCD_AUTH_TOKEN')]) {
+                        sh '''
+                        ARGOCD_SERVER="argocd.int.dev.mykronos.com"
+                        APP_NAME="next-app"
+                        argocd login --username admin --password admin argocd.int.dev.mykronos.com --insecure
+                        # Deploy to ArgoCD
+                        #argocd cluster add
+                        argocd app list
+                        argocd app set next-app --helm-set image.tag=${BUILD_NUMBER}-prd
+                        argocd --grpc-web app sync $APP_NAME --prune
+                        argocd --grpc-web app wait $APP_NAME --timeout 30
+                        '''
+
+                        apwSetEnvironmentStatus status:'Deploy' // APW_APPLICATION and APW_CATEGORY defined at stage level, so, specific to these steps execution
+                        sh "sleep 15s" // replace this step with your own deployment procedure
+                        apwUpdateEnvironment body:[
+                                url: env.ENV_URL,
+                                attributes: [
+                                        OS: env.ENV_OS,
+                                        Owner: env.ENV_OWNER,
+                                        Database: env.ENV_DATABASE
+                                ]
+                        ]
+                        apwSetDeployedVersion version:currentBuild.number
+                        apwSetEnvironmentStatus status:'Up'
+               }
+            }
+        }
+        stage ('Healthcheck Prod App') {
+             steps {
+                 test_app(APP_URL,"healthcheck")
+             }
+        }
+        stage ('Workspace Cleanup'){
+            steps{
+                cleanWs deleteDirs: true
+            }
+        }
+    }
+}
+
+def test_app(url,message) {
+    script {
+     url.each { entry ->
+	    //sh "curl -I ${entry}"
+
+		final def (String response, int code) =
+			sh(script: "curl -s -w '\\n%{response_code}' $entry", returnStdout: true)
+				.trim()
+				.tokenize("\n")
+
+		echo "HTTP response status code: $code"
+
+		if (code == 200) {
+		    echo "Application $message performed SUCCESSFULLY!!"
+		}else{
+		    echo "Application $message FAILED!!"
+		}
+        }
+    }
+}

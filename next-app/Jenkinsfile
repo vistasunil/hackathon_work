@@ -1,0 +1,401 @@
+@Library('apwide-jenkins-shared-lib') _
+
+APP_URL_KENG = "http://next-app-keng.int.dev.mykronos.com"
+APP_URL_STG = "http://next-app-stg.int.dev.mykronos.com"
+APP_URL_PRD = "http://next-app-prd.int.dev.mykronos.com"
+
+pipeline {
+    agent {
+        node {
+            label 'docker-vm'
+        }
+    }
+    
+    environment {
+        APW_JIRA_BASE_URL = 'http://jira.int.dev.mykronos.com' // these variables can be defined at different level: jenkins global properties, pipeline level, stage level
+        APW_JIRA_CREDENTIALS_ID = 'jira-credentials'
+        APW_APPLICATION = 'coe_next_app'
+        BITBUCKET_URL = 'http://bitbucket.int.dev.mykronos.com/scm/kub/next-app.git'
+        ARGOCD_SERVER="argocd.int.dev.mykronos.com"
+        ARGOCD_APP_NAME="next-app"      
+    }    
+    
+    parameters {
+        booleanParam('PROMOTE_TO_PROD')
+    }
+
+    stages {       
+        stage('Prepare') {
+            steps {
+                script {
+                    def scmVars = checkout([$class: 'GitSCM',
+                    branches: [[name: "master"]],
+                    doGenerateSubmoduleConfigurations: false,
+                    submoduleCfg: [],
+                    userRemoteConfigs: [[credentialsId: 'bitbucket', url: 'http://bitbucket.int.dev.mykronos.com/scm/kub/next-app.git']]
+                    ])
+                    commit = "${scmVars.GIT_COMMIT}"[0..10]
+                    version = "${BUILD_NUMBER}-${commit}"
+                    
+                    env.JIRA_ID = sh (script: "git log -1 --pretty=%B ${commit} | cut -d':' -f1", returnStdout: true).trim()
+                    echo "${env.JIRA_ID}"
+                }
+            }
+        }
+        
+        stage ('Build Image & artifacts, Push to GCR DEV') {
+             steps {
+                     withCredentials([file(credentialsId: "gcloud-token", variable: 'GCLOUD_AUTH_TOKEN')]) {
+                        sh '''
+                        #!/bin/bash -x
+                        set -e
+                        gcloud config set project gcp-keng01
+                        gcloud auth activate-service-account --key-file="$GCLOUD_AUTH_TOKEN"
+                        cd ${WORKSPACE}/
+                        docker build --network host -f build/Dockerfile --pull -t gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} -t gcr.io/gcp-keng01/next-app:latest .
+                        cat $GCLOUD_AUTH_TOKEN |  docker login -u _json_key --password-stdin https://gcr.io
+                        docker push gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} 
+                        docker push gcr.io/gcp-keng01/next-app:latest 
+                        '''
+                     }
+             }
+        }
+
+        stage ('Code Quality Check') {
+
+    		environment {
+        		scannerHome = tool 'sonar'
+    		}
+    		steps {
+        			withSonarQubeEnv('sonar') {
+           				sh "${scannerHome}/bin/sonar-scanner -X"
+        			}
+            
+				script {
+                   withEnv(['JIRA_SITE=jira']) {  
+                       
+                       
+						def fieldsResponse = jiraGetFields()
+                         
+                         // Update Sonarqube status to Jira
+                        def sonarFieldId = getFieldId(fieldsResponse.data, 'Sonarqube Coverage')
+                        def sonarValue = [fields: [ "${sonarFieldId}": "40"]]
+                        response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: sonarValue
+                        echo response.successful.toString()
+                        echo response.data.toString()
+					}
+				}
+            }
+        }
+
+        stage ('Deploy APP in Keng Env') {
+
+            environment {
+                APW_CATEGORY = 'KENG'
+                APW_ENVIRONMENT_ID = '15'
+                ENV_URL = 'http://next-app-keng.int.dev.mykronos.com'
+                ENV_OS = 'Docker'
+                ENV_OWNER = 'wfdk8steam@ukg.com'
+                ENV_DATABASE = 'PPAS'
+                ENV_APPROVE_URL = "$BUILD_URL/input"
+            }
+             steps {
+                 
+                    script {
+					   withEnv(['JIRA_SITE=jira']) {  
+							def fieldsResponse = jiraGetFields()
+							 
+							 // Update deployment in progress status to Jira for Keng
+							def kengBeforeFieldId = getFieldId(fieldsResponse.data, 'KENG Deployment Status')
+							def kengBeforeValue = [fields: [ "${kengBeforeFieldId}": "Deploying..."]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: kengBeforeValue
+							echo response.successful.toString()
+							echo response.data.toString()
+					   }
+                    }
+							
+							// Deploying in KENG             
+                     withCredentials([string(credentialsId: "argocd-deploy-role", variable: 'ARGOCD_AUTH_TOKEN')]) {
+                        sh '''
+                        ARGOCD_SERVER="argocd.int.dev.mykronos.com"
+                        APP_NAME="next-app-keng"
+                        argocd login --username admin --password admin $ARGOCD_SERVER --insecure
+                        # Deploy to ArgoCD
+                        #argocd cluster add
+                        argocd app list
+                        argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER} --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_keng_79ff66bd7715e3bb" --helm-set ingress.hosts[0].host="next-app-keng.int.dev.mykronos.com"
+                        argocd --grpc-web app sync $APP_NAME --prune
+                        argocd --grpc-web app wait $APP_NAME --timeout 600
+                        '''
+                    
+					// Update Last deployed env to Keng in Jira
+					script {
+					   withEnv(['JIRA_SITE=jira']) {  
+							def fieldsResponse = jiraGetFields()
+							 
+							 // Update Testing status to Jira
+							def kengFieldId = getFieldId(fieldsResponse.data, 'Last Deployed Environment')
+							def kengValue = [fields: [ "${kengFieldId}": "KENG"]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: kengValue
+							echo response.successful.toString()
+							echo response.data.toString()
+							
+							// Update Approval Link
+							 def customFieldId = getFieldId(fieldsResponse.data, 'Jenkins Next Env Deploy Approval')
+							 def testIssue = [fields: [ "${customFieldId}": "${env.ENV_APPROVE_URL}"]]
+							 response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: testIssue
+							 echo response.successful.toString()
+							 echo response.data.toString() 
+							 
+						    // Update deployment in progress status to Jira for Keng
+							def kengAfterFieldId = getFieldId(fieldsResponse.data, 'KENG Deployment Status')
+							def kengAfterValue = [fields: [ "${kengAfterFieldId}": "Deployed"]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: kengAfterValue
+							echo response.successful.toString()
+							echo response.data.toString()
+							 
+							// Transition Jira state from InProgress to WaitingToAccept
+							 def transitionInput =
+							  [
+								  transition: [
+									  id: '101'
+								  ]
+							  ]
+						
+							  jiraTransitionIssue idOrKey: "${env.JIRA_ID}", input: transitionInput
+						}
+					}
+					
+					// Update GoLive Environment status for KENG
+                    apwSetEnvironmentStatus status:'Deploy' // update status change to 'Deploy' for environment identified by APW_APPLICATION and APW_CATEGORY
+    
+                    sh "sleep 5s" // replace this step with your own deployment procedure
+        
+                    apwUpdateEnvironment body:[
+                            url: env.ENV_URL,
+                            attributes: [
+                                    OS: env.ENV_OS,
+                                    Owner: env.ENV_OWNER,
+                                    Database: env.ENV_DATABASE,
+                              		Jenkins_URL: env.ENV_APPROVE_URL
+                            ]
+                    ] // update environment information with data we can collect in jenkins for environment identified by APW_ENVIRONMENT_ID
+                
+                    apwSetDeployedVersion version:version //currentBuild.number // update deployed version for environment identified by APW_APPLICATION and APW_CATEGORY
+            
+                    apwSetEnvironmentStatus status:'UP'
+               }
+            }
+        }
+        stage ('Test Dev App') {
+             steps {
+                test_app(APP_URL_KENG,"testing")
+				script {
+                   withEnv(['JIRA_SITE=jira']) {  
+						def fieldsResponse = jiraGetFields()
+                         
+                         // Update Testing status to Jira
+                        def testFieldId = getFieldId(fieldsResponse.data, 'Testing Cases Status')
+                        def testResult = [fields: [ "${testFieldId}": ["Passed:10","Failed:2"]]]
+                        response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: testResult
+                        echo response.successful.toString()
+                        echo response.data.toString()
+					}
+				}
+             }
+        }
+        stage ('Scan Image') {
+             steps {
+                 script {
+                    if (PROMOTE_TO_PROD == 'false'){
+                        def deployProd = input (id: 'Deploy', message: 'Deploy to production?', submitter: 'sunil.s.kumar', parameters: [choice(choices: ['yes','no'], description: 'Proceed to Production deployment?', name: 'deployProd')])
+                        
+                        if (deployProd == 'yes'){
+                            echo "Proceeding to PRD env!!"
+                            echo "Image Scanned successfully!!"
+                        }
+                    }
+                    else if (PROMOTE_TO_PROD == 'false'){
+                        echo "Proceeding to PRD env!!"
+                        echo "Image Scanned successfully!!"
+                    }
+					withEnv(['JIRA_SITE=jira']) {  
+						def fieldsResponse = jiraGetFields()
+                         
+                         // Update Testing status to Jira
+                        def scanFieldId = getFieldId(fieldsResponse.data, 'Image Scan Results')
+                        def scanValue = [fields: [ "${scanFieldId}": ["Critical:0","High:2","Medium:4","Low:8"]]]
+                        response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: scanValue
+                        echo response.successful.toString()
+                        echo response.data.toString()
+					}
+                }
+             }	
+        }
+        stage ('Promote image to GCR PRD') {
+              steps {
+                     withCredentials([file(credentialsId: "gcloud-token", variable: 'GCLOUD_AUTH_TOKEN')]) {
+                        sh '''
+                        #!/bin/bash -x
+                        docker tag gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                        docker push gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                        docker rmi -f gcr.io/gcp-keng01/next-app:${BUILD_NUMBER} gcr.io/gcp-keng01/next-app:${BUILD_NUMBER}-prd
+                        '''
+                     }
+             }
+        }
+        stage ('Deploy App in STG Env') {
+
+            environment {
+                APW_CATEGORY = 'STG'
+                APW_ENVIRONMENT_ID = '18'
+                ENV_URL = 'http://next-app-stg.int.dev.mykronos.com'
+                ENV_OS = 'Docker'
+                ENV_OWNER = 'wfdk8steam@ukg.com'
+                ENV_DATABASE = 'PPAS'
+            }
+             steps {
+                     withCredentials([string(credentialsId: "argocd-deploy-role", variable: 'ARGOCD_AUTH_TOKEN')]) {
+                        sh '''
+                        ARGOCD_SERVER="argocd.int.dev.mykronos.com"
+                        APP_NAME="next-app-stg"
+                        argocd login --username admin --password admin $ARGOCD_SERVER --insecure
+                        # Deploy to ArgoCD
+                        #argocd cluster add
+                        argocd app list
+                        argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER}-prd --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_stg_b929b6bd82e5329e"  --helm-set ingress.hosts[0].host="next-app-stg.int.dev.mykronos.com"
+                        argocd --grpc-web app sync $APP_NAME --prune
+                        argocd --grpc-web app wait $APP_NAME --timeout 600
+                        '''
+                    
+					// Update Last deployed env to STG in Jira
+					script {
+					   withEnv(['JIRA_SITE=jira']) {  
+							def fieldsResponse = jiraGetFields()
+							 
+							 // Update Testing status to Jira
+							def stgFieldId = getFieldId(fieldsResponse.data, 'Last Deployed Environment')
+							def stgValue = [fields: [ "${stgFieldId}": "STG"]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: stgValue
+							echo response.successful.toString()
+							echo response.data.toString()
+						}
+					}
+					
+					// Update GoLive Environment status for STG					
+                    apwSetEnvironmentStatus status:'Deploy' // update status change to 'Deploy' for environment identified by APW_APPLICATION and APW_CATEGORY
+    
+                    sh "sleep 5s" // replace this step with your own deployment procedure
+        
+                    apwUpdateEnvironment body:[
+                            url: env.ENV_URL,
+                            attributes: [
+                                    OS: env.ENV_OS,
+                                    Owner: env.ENV_OWNER,
+                                    Database: env.ENV_DATABASE
+                            ]
+                    ] // update environment information with data we can collect in jenkins for environment identified by APW_ENVIRONMENT_ID
+                
+                    apwSetDeployedVersion version:version //currentBuild.number // update deployed version for environment identified by APW_APPLICATION and APW_CATEGORY
+            
+                    apwSetEnvironmentStatus status:'UP'
+               }
+            }
+        }
+        stage ('Deploy App in Prd Env') {
+             when {
+                 equals expected: 'Prod', actual: 'Prod'
+             }
+             environment {
+                 APW_CATEGORY = 'PRD'
+                 APW_ENVIRONMENT_ID = '17'
+                 ENV_URL = "http://next-app-prd.int.dev.mykronos.com"
+                 ENV_OS = 'Ubuntu'
+                 ENV_OWNER = 'wfdk8steam@ukg.com'
+                 ENV_DATABASE = 'Postgres'
+             }
+            
+             steps {
+                     withCredentials([string(credentialsId: "argocd-deploy-role", variable: 'ARGOCD_AUTH_TOKEN')]) {
+                        sh '''
+                        ARGOCD_SERVER="argocd.int.dev.mykronos.com"
+                        APP_NAME="next-app-prd"
+                        argocd login --username admin --password admin argocd.int.dev.mykronos.com --insecure
+
+                        # Deploy to ArgoCD
+                        #argocd cluster add
+                        argocd app list
+                        #argocd app set $APP_NAME --helm-set image.tag=v1 --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_prd_1f020df1de409537" --helm-set ingress.hosts[0].host="next-app-prd.int.dev.mykronos.com"
+                        argocd app set $APP_NAME --helm-set image.tag=${BUILD_NUMBER}-prd --helm-set gb_key="http://growthbook-api.int.dev.mykronos.com/api/features/key_prd_1f020df1de409537" --helm-set ingress.hosts[0].host="next-app-prd.int.dev.mykronos.com"
+                        argocd --grpc-web app sync $APP_NAME --prune
+                        argocd --grpc-web app wait $APP_NAME --timeout 600
+                        '''
+						
+					// Update Last deployed env to STG in Jira
+					script {
+					   withEnv(['JIRA_SITE=jira']) {  
+							def fieldsResponse = jiraGetFields()
+							 
+							 // Update Testing status to Jira
+							def prdFieldId = getFieldId(fieldsResponse.data, 'Last Deployed Environment')
+							def prdValue = [fields: [ "${prdFieldId}": "PRD"]]
+							response = jiraEditIssue idOrKey: "${env.JIRA_ID}", issue: prdValue
+							echo response.successful.toString()
+							echo response.data.toString()
+						}
+					}
+					
+					// Update GoLive Environment status for prd	
+                                        
+                        apwSetEnvironmentStatus status:'Deploy' // APW_APPLICATION and APW_CATEGORY defined at stage level, so, specific to these steps execution
+                        sh "sleep 15s" // replace this step with your own deployment procedure
+                        apwUpdateEnvironment body:[
+                                url: env.ENV_URL,
+                                attributes: [
+                                        OS: env.ENV_OS,
+                                        Owner: env.ENV_OWNER,
+                                        Database: env.ENV_DATABASE
+                                ]
+                        ]
+                        apwSetDeployedVersion version:version //currentBuild.number
+                        apwSetEnvironmentStatus status:'Up'
+               }
+            }
+        }        
+        stage ('Healthcheck Prod App') {
+             steps {
+                 test_app(APP_URL_PRD,"healthcheck")
+             }
+        }        
+        stage ('Workspace Cleanup'){
+            steps{
+                cleanWs deleteDirs: true
+            }
+        }
+    }
+}
+
+def test_app(url,message) {
+    script {
+		final def (String response, int code) =
+			sh(script: "curl -s -w '\\n%{response_code}' $url", returnStdout: true)
+				.trim()
+				.tokenize("\n")
+				
+		echo "HTTP response status code: $code"
+		
+		if (code == 200) {
+		    echo "Application $message performed SUCCESSFULLY!!"
+		}else{
+		    echo "Application $message FAILED!!"
+		}
+        }
+}
+
+def getFieldId(fields, fieldName) {
+    for (i = 0; i <fields.size(); i++) {
+        if(fields[i].custom && fields[i].name == fieldName) {
+            return fields[i].id
+        }
+     }
+}
