@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    meta.helm.sh/release-name: jira
+    meta.helm.sh/release-namespace: jira
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/affinity-mode: persistent
+    nginx.ingress.kubernetes.io/proxy-body-size: 250m
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+  creationTimestamp: "2022-06-17T12:06:43Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/instance: jira
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: jira
+    app.kubernetes.io/version: 8.20.8
+    helm.sh/chart: jira-1.4.0
+  name: jira
+  namespace: jira
+  resourceVersion: "82637390"
+  uid: eb395949-cf8e-4780-85f9-2afdb3854f3b
+spec:
+  rules:
+  - host: jira.int.dev.mykronos.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: jira
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+status:
+  loadBalancer:
+    ingress:
+    - ip: 10.3.193.211

@@ -1,0 +1,20 @@
+apiVersion: v1
+data:
+  SONAR_JDBC_URL: jdbc:postgresql://sonar-postgresql:5432/sonarDB
+  SONAR_JDBC_USERNAME: sonarUser
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: sonar
+    meta.helm.sh/release-namespace: sonar
+  creationTimestamp: "2022-06-27T10:30:03Z"
+  labels:
+    app: sonarqube
+    app.kubernetes.io/managed-by: Helm
+    chart: sonarqube-4.0.3
+    heritage: Helm
+    release: sonar
+  name: sonar-sonarqube-jdbc-config
+  namespace: sonar
+  resourceVersion: "94078228"
+  uid: 16103a52-1fb1-463c-a0cc-be3bcb3e4133

@@ -1,0 +1,45 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    meta.helm.sh/release-name: growthbook
+    meta.helm.sh/release-namespace: growthbook
+  creationTimestamp: "2022-06-20T09:18:42Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/instance: growthbook
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: growthbook
+    app.kubernetes.io/version: 1.16.0
+    helm.sh/chart: growthbook-0.1.0
+  name: growthbook
+  namespace: growthbook
+  resourceVersion: "85933169"
+  uid: aadffbbc-aad9-4bc5-8c52-e9e87bd35ebe
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: growthbook.int.dev.mykronos.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: growthbook
+            port:
+              number: 80
+        path: /
+        pathType: ImplementationSpecific
+  - host: growthbook-api.int.dev.mykronos.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: growthbook
+            port:
+              number: 3100
+        path: /
+        pathType: ImplementationSpecific
+status:
+  loadBalancer:
+    ingress:
+    - ip: 10.3.193.211

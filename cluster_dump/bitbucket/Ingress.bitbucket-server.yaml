@@ -1,0 +1,41 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    meta.helm.sh/release-name: bitbucket-server
+    meta.helm.sh/release-namespace: bitbucket
+    nginx.ingress.kubernetes.io/affinity: cookie
+    nginx.ingress.kubernetes.io/affinity-mode: persistent
+    nginx.ingress.kubernetes.io/proxy-body-size: 250m
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+  creationTimestamp: "2022-06-16T11:01:05Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/instance: bitbucket-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: bitbucket
+    app.kubernetes.io/version: 7.21.1
+    helm.sh/chart: bitbucket-1.4.0
+  name: bitbucket-server
+  namespace: bitbucket
+  resourceVersion: "81467919"
+  uid: 1329a2ee-e4f3-4f42-8b0b-551e71954b91
+spec:
+  rules:
+  - host: bitbucket.int.dev.mykronos.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: bitbucket-server
+            port:
+              number: 80
+        path: /
+        pathType: Prefix
+status:
+  loadBalancer:
+    ingress:
+    - ip: 10.3.193.211

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kubernetes.io/createdby: gce-pd-dynamic-provisioner
+    pv.kubernetes.io/bound-by-controller: "yes"
+    pv.kubernetes.io/provisioned-by: kubernetes.io/gce-pd
+  creationTimestamp: "2022-06-27T10:13:25Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    topology.kubernetes.io/region: us-east1
+    topology.kubernetes.io/zone: us-east1-b
+  name: pvc-96f3bec5-be8e-4fe3-a6f9-0e7409aeab1f
+  resourceVersion: "94063732"
+  uid: 0990db0e-760e-4132-839a-1f7151fc0de3
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 20Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: data-sonar-postgresql-0
+    namespace: sonar
+    resourceVersion: "94063694"
+    uid: 96f3bec5-be8e-4fe3-a6f9-0e7409aeab1f
+  gcePersistentDisk:
+    fsType: ext4
+    pdName: gke-coe-e955dbc2-dynam-pvc-96f3bec5-be8e-4fe3-a6f9-0e7409aeab1f
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - us-east1-b
+        - key: topology.kubernetes.io/region
+          operator: In
+          values:
+          - us-east1
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: standard
+  volumeMode: Filesystem
+status:
+  phase: Bound

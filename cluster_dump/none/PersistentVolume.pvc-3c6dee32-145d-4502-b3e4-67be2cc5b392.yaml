@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kubernetes.io/createdby: gce-pd-dynamic-provisioner
+    pv.kubernetes.io/bound-by-controller: "yes"
+    pv.kubernetes.io/provisioned-by: kubernetes.io/gce-pd
+  creationTimestamp: "2022-06-09T14:21:52Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    topology.kubernetes.io/region: us-east1
+    topology.kubernetes.io/zone: us-east1-c
+  name: pvc-3c6dee32-145d-4502-b3e4-67be2cc5b392
+  resourceVersion: "74142430"
+  uid: 734ba316-e711-40d0-9835-bc07b3f47db5
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: picalc-source-pvc
+    namespace: tekton-argocd-cicd
+    resourceVersion: "74142406"
+    uid: 3c6dee32-145d-4502-b3e4-67be2cc5b392
+  gcePersistentDisk:
+    fsType: ext4
+    pdName: gke-coe-e955dbc2-dynam-pvc-3c6dee32-145d-4502-b3e4-67be2cc5b392
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - us-east1-c
+        - key: topology.kubernetes.io/region
+          operator: In
+          values:
+          - us-east1
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: standard
+  volumeMode: Filesystem
+status:
+  phase: Bound

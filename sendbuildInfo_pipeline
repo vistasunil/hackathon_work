@@ -1,0 +1,81 @@
+
+pipeline {
+    agent any
+    environment {
+        APW = "$BUILD_URL/input"
+    }
+    
+    stages {       
+        stage('Prepare') {
+            steps {
+                script {
+      
+              def scmVars = checkout([$class: 'GitSCM',
+                branches: [[name: "KSCOE-2-next-app-deployment"]],
+                doGenerateSubmoduleConfigurations: false,
+                submoduleCfg: [],
+                userRemoteConfigs: [[credentialsId: 'bitbucket', url: 'http://bitbucket.int.dev.mykronos.com/scm/kub/next-app.git']]
+                ])
+                commit = "${scmVars.GIT_COMMIT}"[0..10]
+                echo "${BUILD_NUMBER}-${commit}"
+            }
+            }
+        }
+        stage ('Check Code Quality') {
+             steps {
+                
+                sh "echo ${BUILD_NUMBER}"
+                sh "echo ${BUILD_NUMBER}-${commit}"
+                echo "Passed code quality parameters successfully!!"
+             }
+        }
+        stage('get issue') {
+            steps{
+                script{
+            withEnv(['JIRA_SITE=jira']) {
+              def issue = jiraGetIssue idOrKey: 'KSCOE-3'
+              echo issue.data.toString()
+            }}
+          }
+        }
+        stage ('Build Docker Image') {
+            steps{
+            
+                script {
+
+                       // def deployProd = input (id: 'Deploy', message: 'Deploy to production?', submitter: 'sunil.s.kumar', parameters: [choice(choices: ['yes','no'], description: 'Proceed to Production deployment?', name: 'deployProd')])
+                        
+                        //if (deployProd == 'yes'){
+                            echo "Proceeding to PRD env!!"
+                            echo "Image Scanned successfully!!"
+                        //}
+                }
+             }
+             post {
+                 always {
+                    echo "HI"
+                 }
+                 success {
+                    echo 'Deployment successful'
+                    // Notify Jira if the deployment succeeded
+                    //jiraGetIssue idOrKey: 'KSCOE-3'
+                    //script{
+                    //withEnv(['JIRA_SITE=jira']) {
+                    jiraSendDeploymentInfo (
+                        site: env.jira, 
+                        //issueKeys: ['KSCOE-3'],
+                        state: 'successful'
+                    )
+                    //}}
+                }
+            }
+        }
+		stage ('Push Application Image to GCR') {
+             steps {    
+                sh """
+				echo "Successfully pushed application image to GCR!!"
+                """
+             }       
+        }
+    }
+}

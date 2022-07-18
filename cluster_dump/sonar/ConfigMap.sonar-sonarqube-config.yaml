@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: sonar
+    meta.helm.sh/release-namespace: sonar
+  creationTimestamp: "2022-06-27T10:30:03Z"
+  labels:
+    app: sonarqube
+    app.kubernetes.io/managed-by: Helm
+    chart: sonarqube-4.0.3
+    heritage: Helm
+    release: sonar
+  name: sonar-sonarqube-config
+  namespace: sonar
+  resourceVersion: "94078234"
+  uid: acf9a13f-77fb-46df-b614-4de87c1018f4

@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kubernetes.io/createdby: gce-pd-dynamic-provisioner
+    pv.kubernetes.io/bound-by-controller: "yes"
+    pv.kubernetes.io/provisioned-by: kubernetes.io/gce-pd
+  creationTimestamp: "2022-06-20T09:18:42Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    topology.kubernetes.io/region: us-east1
+    topology.kubernetes.io/zone: us-east1-c
+  name: pvc-5c40cfce-3b44-4a9d-8e0b-60f6a38c70d7
+  resourceVersion: "85933185"
+  uid: d8abc8d6-b7d0-494f-aaf6-961b612086af
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 5Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: growthbook-efs-claim
+    namespace: growthbook
+    resourceVersion: "85933139"
+    uid: 5c40cfce-3b44-4a9d-8e0b-60f6a38c70d7
+  gcePersistentDisk:
+    fsType: ext4
+    pdName: gke-coe-e955dbc2-dynam-pvc-5c40cfce-3b44-4a9d-8e0b-60f6a38c70d7
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: topology.kubernetes.io/zone
+          operator: In
+          values:
+          - us-east1-c
+        - key: topology.kubernetes.io/region
+          operator: In
+          values:
+          - us-east1
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: standard
+  volumeMode: Filesystem
+status:
+  phase: Bound

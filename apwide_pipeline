@@ -1,0 +1,86 @@
+@Library('apwide-jenkins-shared-lib') _
+
+pipeline {
+    agent any
+    environment {
+        APW_JIRA_BASE_URL = 'http://jira.int.dev.mykronos.com' // these variables can be defined at different level: jenkins global properties, pipeline level, stage level
+        APW_JIRA_CREDENTIALS_ID = 'jira-credentials'
+        APW_APPLICATION = 'test1'
+    }
+    parameters {
+        choice(name: 'PROMOTE_TO_ENV', choices: ['Training', 'Integration 1'], description: 'Should the output be promoted to an environment ?')
+    }
+    
+    stages{
+    
+        stage('Build & Test') { //
+            steps {
+                script {
+                    sh 'sleep 2s' // here is just an example of build stage, build you can define your here, or choose to put on another pipeline
+                }
+            }
+        }
+        stage('Deploy on Dev') {
+            when {
+                equals expected: 'Training', actual: params.PROMOTE_TO_ENV
+            }
+            environment {
+                APW_CATEGORY = 'Training'
+                APW_ENVIRONMENT_ID = '6'
+                ENV_URL = 'http://growthbook-app.int.dev.mykronos.com'
+                ENV_OS = 'Windows'
+                ENV_OWNER = 'wfdk8steam@ukg.com'
+                ENV_DATABASE = 'PPAS'
+            }
+            steps {
+
+                apwSetEnvironmentStatus status:'Deploy' // update status change to 'Deploy' for environment identified by APW_APPLICATION and APW_CATEGORY
+    
+                sh "sleep 5s" // replace this step with your own deployment procedure
+    
+                apwUpdateEnvironment body:[
+                        url: env.ENV_URL,
+                        attributes: [
+                                OS: env.ENV_OS,
+                                Owner: env.ENV_OWNER,
+                                Database: env.ENV_DATABASE
+                        ]
+                ] // update environment information with data we can collect in jenkins for environment identified by APW_ENVIRONMENT_ID
+            
+                apwSetDeployedVersion version:currentBuild.number // update deployed version for environment identified by APW_APPLICATION and APW_CATEGORY
+        
+                apwSetEnvironmentStatus status:'UP'
+				
+            }
+        }
+        stage('Deploy on Integration 1') {
+            when {
+                equals expected: 'Integration 1', actual: params.PROMOTE_TO_ENV
+            }
+            environment {
+                APW_CATEGORY = 'Integration 1'
+                APW_ENVIRONMENT_ID = '5'
+                ENV_URL = 'http://growthbook-app.int.dev.mykronos.com'
+                ENV_OS = 'Ubuntu'
+                ENV_OWNER = 'wfdk8steam@ukg.com'
+                ENV_DATABASE = 'Postgres'
+            }
+            steps {
+ 
+                apwSetEnvironmentStatus status:'Deploy' // APW_APPLICATION and APW_CATEGORY defined at stage level, so, specific to these steps execution
+                sh "sleep 15s" // replace this step with your own deployment procedure
+                apwUpdateEnvironment body:[
+                        url: env.ENV_URL,
+                        attributes: [
+                                OS: env.ENV_OS,
+                                Owner: env.ENV_OWNER,
+                                Database: env.ENV_DATABASE
+                        ]
+                ]
+                apwSetDeployedVersion version:currentBuild.number
+                apwSetEnvironmentStatus status:'Up'
+                
+            }
+        }
+    }
+}

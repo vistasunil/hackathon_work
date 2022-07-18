@@ -1,0 +1,19 @@
+apiVersion: v1
+data:
+  init_fs.sh: ""
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: sonar
+    meta.helm.sh/release-namespace: sonar
+  creationTimestamp: "2022-06-27T10:30:03Z"
+  labels:
+    app: sonarqube
+    app.kubernetes.io/managed-by: Helm
+    chart: sonarqube-4.0.3
+    heritage: Helm
+    release: sonar
+  name: sonar-sonarqube-init-fs
+  namespace: sonar
+  resourceVersion: "94078231"
+  uid: b138bc78-98bd-4613-af24-4e5ecf00cf57

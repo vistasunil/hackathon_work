@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    cloud.google.com/load-balancer-type: Internal
+    cloud.google.com/neg: '{"ingress":true}'
+    cloud.google.com/neg-status: '{"network_endpoint_groups":{"0":"k8s2-pw2d14lb-jenkins-test-jenkins-service-lxoestos"},"zones":["us-east1-b","us-east1-c","us-east1-d"]}'
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"Service","metadata":{"annotations":{"prometheus.io/path":"/","prometheus.io/port":"8080","prometheus.io/scrape":"true"},"name":"jenkins-service","namespace":"jenkins-test"},"spec":{"ports":[{"nodePort":32000,"port":8080,"targetPort":8080}],"selector":{"app":"jenkins-server"},"type":"LoadBalancer"}}
+    prometheus.io/path: /
+    prometheus.io/port: "8080"
+    prometheus.io/scrape: "true"
+    service.kubernetes.io/backend-service: k8s2-pw2d14lb-jenkins-test-jenkins-service-lxoestos
+    service.kubernetes.io/firewall-rule: k8s2-pw2d14lb-jenkins-test-jenkins-service-lxoestos
+    service.kubernetes.io/firewall-rule-for-hc: k8s2-pw2d14lb-l4-shared-hc-fw
+    service.kubernetes.io/healthcheck: k8s2-pw2d14lb-l4-shared-hc
+    service.kubernetes.io/tcp-forwarding-rule: k8s2-tcp-pw2d14lb-jenkins-test-jenkins-service-lxoestos
+  creationTimestamp: "2022-06-15T11:32:28Z"
+  finalizers:
+  - gke.networking.io/l4-ilb-v2
+  - service.kubernetes.io/load-balancer-cleanup
+  name: jenkins-service
+  namespace: jenkins-test
+  resourceVersion: "85688172"
+  uid: 1915e027-55f3-40c4-8d60-7d984d14ea6c
+spec:
+  clusterIP: 10.20.0.208
+  clusterIPs:
+  - 10.20.0.208
+  externalTrafficPolicy: Cluster
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - nodePort: 32332
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    app: jenkins-server
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer:
+    ingress:
+    - ip: 10.3.193.214

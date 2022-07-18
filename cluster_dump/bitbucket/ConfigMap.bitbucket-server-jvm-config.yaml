@@ -1,0 +1,21 @@
+apiVersion: v1
+data:
+  additional_jvm_args: -XX:ActiveProcessorCount=2
+  max_heap: 1g
+  min_heap: 512m
+kind: ConfigMap
+metadata:
+  annotations:
+    meta.helm.sh/release-name: bitbucket-server
+    meta.helm.sh/release-namespace: bitbucket
+  creationTimestamp: "2022-06-16T11:01:04Z"
+  labels:
+    app.kubernetes.io/instance: bitbucket-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: bitbucket
+    app.kubernetes.io/version: 7.21.1
+    helm.sh/chart: bitbucket-1.4.0
+  name: bitbucket-server-jvm-config
+  namespace: bitbucket
+  resourceVersion: "81452625"
+  uid: 158dfc42-3a8a-4c53-be44-eb3292e4a954

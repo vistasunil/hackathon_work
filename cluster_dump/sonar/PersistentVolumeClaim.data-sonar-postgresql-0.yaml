@@ -1,0 +1,33 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  annotations:
+    pv.kubernetes.io/bind-completed: "yes"
+    pv.kubernetes.io/bound-by-controller: "yes"
+    volume.beta.kubernetes.io/storage-provisioner: kubernetes.io/gce-pd
+  creationTimestamp: "2022-06-27T10:13:23Z"
+  finalizers:
+  - kubernetes.io/pvc-protection
+  labels:
+    app.kubernetes.io/instance: sonar
+    app.kubernetes.io/name: postgresql
+    role: primary
+  name: data-sonar-postgresql-0
+  namespace: sonar
+  resourceVersion: "94063734"
+  uid: 96f3bec5-be8e-4fe3-a6f9-0e7409aeab1f
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+  volumeMode: Filesystem
+  volumeName: pvc-96f3bec5-be8e-4fe3-a6f9-0e7409aeab1f
+status:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 20Gi
+  phase: Bound

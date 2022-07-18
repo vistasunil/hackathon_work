@@ -1,0 +1,48 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    kubernetes.io/createdby: gce-pd-dynamic-provisioner
+    pv.kubernetes.io/bound-by-controller: "yes"
+    pv.kubernetes.io/provisioned-by: kubernetes.io/gce-pd
+  creationTimestamp: "2022-04-04T08:39:44Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    failure-domain.beta.kubernetes.io/region: us-east1
+    failure-domain.beta.kubernetes.io/zone: us-east1-b
+  name: pvc-bb0d1785-80f6-41c4-9241-5ea8fc8de829
+  resourceVersion: "20501408"
+  uid: 09b327f7-b50d-4f0c-b96a-47d2b76efd8b
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 1Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: www-web-0
+    namespace: default
+    resourceVersion: "20501368"
+    uid: bb0d1785-80f6-41c4-9241-5ea8fc8de829
+  gcePersistentDisk:
+    fsType: ext4
+    pdName: gke-coe-e955dbc2-dynam-pvc-bb0d1785-80f6-41c4-9241-5ea8fc8de829
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+      - matchExpressions:
+        - key: failure-domain.beta.kubernetes.io/zone
+          operator: In
+          values:
+          - us-east1-b
+        - key: failure-domain.beta.kubernetes.io/region
+          operator: In
+          values:
+          - us-east1
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: standard
+  volumeMode: Filesystem
+status:
+  phase: Bound

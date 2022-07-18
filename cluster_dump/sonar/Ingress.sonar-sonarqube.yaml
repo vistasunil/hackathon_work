@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    meta.helm.sh/release-name: sonar
+    meta.helm.sh/release-namespace: sonar
+  creationTimestamp: "2022-06-27T10:30:04Z"
+  generation: 1
+  labels:
+    app: sonarqube
+    app.kubernetes.io/managed-by: Helm
+    chart: sonarqube-4.0.3
+    heritage: Helm
+    release: sonar
+  name: sonar-sonarqube
+  namespace: sonar
+  resourceVersion: "94078275"
+  uid: 95d82ff4-18df-4dc8-9f91-1fc49e145c74
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: sonarqube.int.dev.mykronos.com
+    http:
+      paths:
+      - backend:
+          service:
+            name: sonar-sonarqube
+            port:
+              number: 9000
+        path: /
+        pathType: ImplementationSpecific
+status:
+  loadBalancer:
+    ingress:
+    - ip: 10.3.193.211

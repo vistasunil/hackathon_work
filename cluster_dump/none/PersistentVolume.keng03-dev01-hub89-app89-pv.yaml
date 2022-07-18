@@ -1,0 +1,36 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    meta.helm.sh/release-name: cm-ihub-release
+    meta.helm.sh/release-namespace: cm-ihub-ns
+    pv.kubernetes.io/bound-by-controller: "yes"
+  creationTimestamp: "2022-05-06T07:39:15Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: keng03-dev01-hub89-app89-pv
+  resourceVersion: "45552646"
+  uid: 2f1a8e44-d999-4932-b46c-52c77118db15
+spec:
+  accessModes:
+  - ReadWriteMany
+  capacity:
+    storage: 1Ti
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: keng03-dev01-hub89-app89-pvc
+    namespace: cm-ihub-ns
+    resourceVersion: "45548559"
+    uid: ff85e40c-8e82-4f98-ac5f-4031f78406b1
+  nfs:
+    path: /dev01/hub
+    server: keng01-sfs03-ecfs-mnt01.int.oss-keng.mykronos.com
+  persistentVolumeReclaimPolicy: Delete
+  volumeMode: Filesystem
+status:
+  message: 'Error getting deleter volume plugin for volume "keng03-dev01-hub89-app89-pv":
+    no deletable volume plugin matched'
+  phase: Failed

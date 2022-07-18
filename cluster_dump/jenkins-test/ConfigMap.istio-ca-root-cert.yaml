@@ -1,0 +1,30 @@
+apiVersion: v1
+data:
+  root-cert.pem: |
+    -----BEGIN CERTIFICATE-----
+    MIIC/DCCAeSgAwIBAgIQHGvigOnA1sOJUZdgabcDETANBgkqhkiG9w0BAQsFADAY
+    MRYwFAYDVQQKEw1jbHVzdGVyLmxvY2FsMB4XDTIyMDUyODA4NTkxNFoXDTMyMDUy
+    NTA4NTkxNFowGDEWMBQGA1UEChMNY2x1c3Rlci5sb2NhbDCCASIwDQYJKoZIhvcN
+    AQEBBQADggEPADCCAQoCggEBAM9Opp7JpBT5/QFuWs2R4BvV+3kBZjJZfcte7oRZ
+    lOgL4j/0Ck6qALhdEd+D2FNlfOw3QGtMIhMPt7Hsvrg5vMkOvtISTPCq0yirnnzd
+    OhuFVSAt6c1Td4QjWn+0NUfMP6jflpCTG0WR+ur8gl3a9KhttyKh0jp1nUJts6dA
+    pJXKz7KDiWlPy94C8WvbiGx9U1HFiNHRzWo8za4SW6YB1v66of0zj/vneh0mrVUH
+    ms7ENQ+6qs+LB4s8oBh57JhivC9fIOZfLewf9IMxuKePQMacflkN3X9bvIcK3IiS
+    OhrVD2dHyXhrfBHYUa94GALnDXtD3xHZkXr3/uKzGL5nJSECAwEAAaNCMEAwDgYD
+    VR0PAQH/BAQDAgIEMA8GA1UdEwEB/wQFMAMBAf8wHQYDVR0OBBYEFAaVzPTyXHmz
+    JLb+X+fjkEqJrDEjMA0GCSqGSIb3DQEBCwUAA4IBAQBB7O8iu6ZOcjD+gNJBDZzj
+    /WAlBVlOhftJ3TGInQS/DijfCLyJYDQH921JeCA7+Af7twLMELVGbTYdNSVGfgZ+
+    VgLdlWndb4ZI2TLnBa+7BvkOZyroWUBtB8pcP2w9l+45sl1vCdjt4Ejjl+RTyJ+k
+    JUrMfEy79Ea8aH8VPOlKNvZWF460p4G6+e9TRPnPEt+l525M2kN3XyONwbMI2v9Q
+    kmUsUdkafanif4TfoVE4db23VTLip5KSB3skXWG5PQkGOzBOL9qHr22gE4dm4fNu
+    ocshiDrD1djh/an7w75/GN9sqSm0mFMWjW/OJJEUDYG42R2qEz5KpMCT1Bq/n6ef
+    -----END CERTIFICATE-----
+kind: ConfigMap
+metadata:
+  creationTimestamp: "2022-06-15T10:43:29Z"
+  labels:
+    istio.io/config: "true"
+  name: istio-ca-root-cert
+  namespace: jenkins-test
+  resourceVersion: "80327228"
+  uid: 07fb076e-2a46-46ab-b2a0-20e81f17ea63

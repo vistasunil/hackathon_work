@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  annotations:
+    meta.helm.sh/release-name: sts-rel
+    meta.helm.sh/release-namespace: test-app-ns
+    pv.kubernetes.io/bound-by-controller: "yes"
+  creationTimestamp: "2022-07-08T07:47:54Z"
+  finalizers:
+  - kubernetes.io/pv-protection
+  labels:
+    app.kubernetes.io/instance: sts-rel
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: test-application2
+    app.kubernetes.io/version: 1.16.0
+    helm.sh/chart: test-application2-0.1.0
+  name: sts-rel-test-application2-pv1
+  resourceVersion: "106752100"
+  uid: 2f59a002-662d-4c80-8354-79764524dca3
+spec:
+  accessModes:
+  - ReadWriteOnce
+  capacity:
+    storage: 3Gi
+  claimRef:
+    apiVersion: v1
+    kind: PersistentVolumeClaim
+    name: sts-rel-test-application2-pvc1
+    namespace: test-app-ns
+    resourceVersion: "106752096"
+    uid: aa805986-534d-4460-b5da-4aeba77cab83
+  hostPath:
+    path: /mnt/data
+    type: ""
+  persistentVolumeReclaimPolicy: Delete
+  storageClassName: manual
+  volumeMode: Filesystem
+status:
+  phase: Bound

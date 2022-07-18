@@ -1,0 +1,141 @@
+
+pipeline {
+    agent any
+    environment {
+        APW = "$BUILD_URL/input"
+    }
+    
+    stages {       
+        stage('Prepare') {
+            steps {
+                script {
+      
+              def scmVars = checkout([$class: 'GitSCM',
+                branches: [[name: "master"]],
+                doGenerateSubmoduleConfigurations: false,
+                submoduleCfg: [],
+                userRemoteConfigs: [[credentialsId: 'bitbucket', url: 'http://bitbucket.int.dev.mykronos.com/scm/kub/next-app.git']]
+                ])
+                commit = "${scmVars.GIT_COMMIT}"[0..10]
+                echo "${BUILD_NUMBER}-${commit}"
+            }
+            }
+        }
+        stage ('Check Code Quality') {
+             steps {
+                
+                sh "echo ${BUILD_NUMBER}"
+                sh "echo ${BUILD_NUMBER}-${commit}"
+                echo "Passed code quality parameters successfully!!"
+             }
+        }
+        stage('get issue') {
+            steps{
+                script{
+            withEnv(['JIRA_SITE=jira']) {
+              def issue = jiraGetIssue idOrKey: 'DIM-4'
+              //echo issue.data.toString()
+            }}
+          }
+        }
+        stage ('Build Docker Image') {
+            steps{
+            
+                script {
+                   withEnv(['JIRA_SITE=jira']) {    
+                    /*def searchResults = jiraJqlSearch jql: "project = DIM AND issuekey = 'DIM-4'"
+                    def issues = searchResults.data.issues
+                    for (i = 0; i <issues.size(); i++) {
+                      def fixVersion = jiraNewVersion version: [name: "fix-version-1.0",
+                                                                project: "DIM"]
+                      def testIssue = [fields: [fixVersions: [fixVersion.data]]]
+                      response = jiraEditIssue idOrKey: issues[i].key, issue: testIssue*/
+                      
+                      
+                         def fieldsResponse = jiraGetFields()
+                         
+                         // Update Sonarqube status
+                         def sonarFieldId = getFieldId(fieldsResponse.data, 'Sonarqube Coverage')
+                         def sonarValue = [fields: [ "${sonarFieldId}": "20"]]
+                         response = jiraEditIssue idOrKey: 'DIM-4', issue: sonarValue
+                         echo response.successful.toString()
+                         echo response.data.toString()
+                         
+                        // Update Image Sacnning status
+                         def scanFieldId = getFieldId(fieldsResponse.data, 'Image Scan Results')
+                         def scanValue = [fields: [ "${scanFieldId}": ["Critical:0","High:0","Medium:0","Low:0"]]]
+                         response = jiraEditIssue idOrKey: 'DIM-4', issue: scanValue
+                         echo response.successful.toString()
+                         echo response.data.toString()  
+                         
+                         // Update Testing status
+                         def testFieldId = getFieldId(fieldsResponse.data, 'Testing Cases Status')
+                         def testResult = [fields: [ "${testFieldId}": ["Passed:10","Failed:0"]]]
+                         response = jiraEditIssue idOrKey: 'DIM-4', issue: testResult
+                         echo response.successful.toString()
+                         echo response.data.toString() 
+                         
+                         // Update Last Deployment Env
+                         def envFieldId = getFieldId(fieldsResponse.data, 'Last Deployed Environment')
+                         def envValue = [fields: [ "${envFieldId}": "KENG"]]
+                         response = jiraEditIssue idOrKey: 'DIM-4', issue: envValue
+                         echo response.successful.toString()
+                         echo response.data.toString() 
+                         
+                         // Update Approval Link
+                         def customFieldId = getFieldId(fieldsResponse.data, 'Jenkins Next Env Deploy Approval')
+                         def testIssue = [fields: [ "${customFieldId}": "http://jenkins.int.dev.mykronos.com"]]
+                         response = jiraEditIssue idOrKey: 'DIM-4', issue: testIssue
+                         echo response.successful.toString()
+                         echo response.data.toString() 
+                         
+                      /*def transitionInput =
+                      [
+                          transition: [
+                              id: '101'
+                          ]
+                      ]
+                
+                      jiraTransitionIssue idOrKey: 'DIM-4', input: transitionInput*/
+                    }
+                }
+                
+             }
+             post {
+                 always {
+                    echo "HI"
+                 }
+                 success {
+                    echo 'Deployment successful'
+                    // Notify Jira if the deployment succeeded
+                    //jiraGetIssue idOrKey: 'DIM-4'
+                    script{
+                    withEnv(['JIRA_SITE=jira']) {
+                    jiraSendDeploymentInfo (
+                        site: env.jira, 
+                        issueKeys: ['DIM-4'],
+                        
+                        state: 'successful'
+                    )
+                   // jiraTransitionIssue idOrKey: 'DIM-4', input: transitionInput, site: env.jira
+                    }}
+                }
+            }
+        }
+		stage ('Push Application Image to GCR') {
+             steps {    
+                sh """
+				echo "Successfully pushed application image to GCR!!"
+                """
+             }       
+        }
+    }
+}
+
+def getFieldId(fields, fieldName) {
+    for (i = 0; i <fields.size(); i++) {
+        if(fields[i].custom && fields[i].name == fieldName) {
+            return fields[i].id
+        }
+     }
+}

@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    cloud.google.com/neg: '{"ingress":true}'
+    meta.helm.sh/release-name: bitbucket-server
+    meta.helm.sh/release-namespace: bitbucket
+  creationTimestamp: "2022-06-16T11:01:04Z"
+  labels:
+    app.kubernetes.io/instance: bitbucket-server
+    app.kubernetes.io/managed-by: Helm
+    app.kubernetes.io/name: bitbucket
+    app.kubernetes.io/version: 7.21.1
+    helm.sh/chart: bitbucket-1.4.0
+  name: bitbucket-server
+  namespace: bitbucket
+  resourceVersion: "81452637"
+  uid: 3cb0bb50-3f8a-4381-9954-34cea0645042
+spec:
+  clusterIP: 10.20.0.212
+  clusterIPs:
+  - 10.20.0.212
+  ipFamilies:
+  - IPv4
+  ipFamilyPolicy: SingleStack
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP
+    targetPort: http
+  - name: ssh
+    port: 7999
+    protocol: TCP
+    targetPort: ssh
+  - name: hazelcast
+    port: 5701
+    protocol: TCP
+    targetPort: hazelcast
+  selector:
+    app.kubernetes.io/instance: bitbucket-server
+    app.kubernetes.io/name: bitbucket
+  sessionAffinity: None
+  type: ClusterIP
+status:
+  loadBalancer: {}

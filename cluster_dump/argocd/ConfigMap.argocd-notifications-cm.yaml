@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","kind":"ConfigMap","metadata":{"annotations":{},"name":"argocd-notifications-cm","namespace":"argocd"}}
+  creationTimestamp: "2022-06-21T06:03:59Z"
+  name: argocd-notifications-cm
+  namespace: argocd
+  resourceVersion: "86921474"
+  uid: 345d884f-f7dd-4422-aa58-2528a20d8272
